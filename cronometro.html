@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Cronómetro para Shows</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background-color: black;
+      color: white;
+      height: 100%;
+      font-family: monospace;
+      overflow: hidden;
+    }
+
+    #timer {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100%;
+      font-size: 20vw;
+      user-select: none;
+      position: relative;
+    }
+
+    #extra-label {
+      position: absolute;
+      top: 8%;
+      width: 100%;
+      text-align: center;
+      font-size: 8vw;
+      color: white;
+      display: none;
+      font-weight: bold;
+      text-shadow: 4px 4px 10px black;
+      animation: blink 1s step-start infinite;
+    }
+
+    @keyframes blink {
+      50% { opacity: 0; }
+    }
+
+    #controls-toggle, #fullscreen-toggle {
+      position: absolute;
+      width: 25px;
+      height: 25px;
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      z-index: 2;
+    }
+
+    #controls-toggle {
+      bottom: 15px;
+      right: 15px;
+    }
+
+ #fullscreen-toggle {
+  bottom: 15px;
+  left: 15px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 22px;
+  color: rgba(255, 255, 255, 0.4);
+  z-index: 2;
+}
+
+  
+    #controls {
+      position: absolute;
+      bottom: 55px;
+      right: 15px;
+      background: rgba(0,0,0,0.9);
+      color: white;
+      padding: 10px;
+      border: 1px solid #555;
+      display: none;
+      z-index: 2;
+      min-width: 200px;
+    }
+
+    input, select, button {
+      margin-top: 5px;
+      width: 100%;
+      padding: 5px;
+      background: #222;
+      color: white;
+      border: 1px solid #444;
+      font-size: 14px;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .red-background {
+      background-color: red !important;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="timer">
+    <div id="extra-label">TIEMPO EXTRA</div>
+    <div id="time-text">00:00:00</div>
+  </div>
+
+  <button id="controls-toggle" title="Opciones"></button>
+ <button id="fullscreen-toggle" title="Pantalla completa">⛶</button>
+
+
+  <div id="controls">
+    <label>
+      Modo:
+      <select id="mode">
+        <option value="up">Cuenta Ascendente</option>
+        <option value="down">Cuenta Descendente</option>
+        <option value="overtime">Sobretiempo</option>
+      </select>
+    </label>
+
+    <div id="start-time-container" class="hidden">
+      <label>
+        Tiempo inicial (hh:mm:ss):
+        <input type="text" id="start-time" value="00:05:00" />
+      </label>
+    </div>
+
+    <div id="limit-time-container" class="hidden">
+      <label>
+        Límite rojo (hh:mm:ss):
+        <input type="text" id="limit-time" value="00:10:00" />
+      </label>
+    </div>
+
+    <button onclick="startTimer()">Iniciar</button>
+    <button onclick="pauseTimer()">Pausar</button>
+    <button onclick="resetTimer()">Reiniciar</button>
+  </div>
+
+  <script>
+    const timeDisplay = document.getElementById("time-text");
+    const extraLabel = document.getElementById("extra-label");
+    const modeSelect = document.getElementById("mode");
+    const startTimeInput = document.getElementById("start-time");
+    const limitTimeInput = document.getElementById("limit-time");
+    const startTimeContainer = document.getElementById("start-time-container");
+    const limitTimeContainer = document.getElementById("limit-time-container");
+    const controls = document.getElementById("controls");
+    const controlsToggle = document.getElementById("controls-toggle");
+    const fullscreenToggle = document.getElementById("fullscreen-toggle");
+
+    let interval = null;
+    let totalSeconds = 0;
+    let countingDown = false;
+    let overtimeMode = false;
+    let inOvertime = false;
+    let limitSeconds = null;
+
+    controlsToggle.onclick = () => {
+      controls.style.display = controls.style.display === "none" ? "block" : "none";
+    };
+
+    fullscreenToggle.onclick = () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+      } else {
+        document.exitFullscreen();
+      }
+    };
+
+    modeSelect.onchange = () => {
+      const mode = modeSelect.value;
+      startTimeContainer.classList.toggle("hidden", !(mode === "down" || mode === "overtime"));
+      limitTimeContainer.classList.toggle("hidden", mode !== "up");
+    };
+
+    modeSelect.onchange();
+
+    function parseTime(hms) {
+      const parts = hms.split(":").map(Number);
+      if (parts.length !== 3) return 0;
+      return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    }
+
+    function formatTime(seconds) {
+      const sign = seconds < 0 ? "-" : "";
+      seconds = Math.abs(seconds);
+      const hrs = String(Math.floor(seconds / 3600)).padStart(2, '0');
+      const mins = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
+      const secs = String(seconds % 60).padStart(2, '0');
+      return `${sign}${hrs}:${mins}:${secs}`;
+    }
+
+    function updateDisplay() {
+      timeDisplay.textContent = formatTime(totalSeconds);
+    }
+
+    function tick() {
+      if (overtimeMode) {
+        if (!inOvertime) {
+          if (totalSeconds > 0) {
+            totalSeconds--;
+          } else {
+            inOvertime = true;
+            totalSeconds = 0;
+            document.body.classList.add("red-background");
+            extraLabel.style.display = "block";
+          }
+        } else {
+          totalSeconds++;
+        }
+        updateDisplay();
+      } else if (countingDown) {
+        if (totalSeconds > 0) {
+          totalSeconds--;
+          updateDisplay();
+          if (totalSeconds === 0) {
+            document.body.classList.add("red-background");
+            clearInterval(interval);
+          }
+        }
+      } else {
+        totalSeconds++;
+        updateDisplay();
+        if (limitSeconds !== null && totalSeconds >= limitSeconds) {
+          document.body.classList.add("red-background");
+        } else {
+          document.body.classList.remove("red-background");
+        }
+      }
+    }
+
+    function startTimer() {
+      clearInterval(interval);
+      document.body.classList.remove("red-background");
+      extraLabel.style.display = "none";
+
+      const mode = modeSelect.value;
+      overtimeMode = mode === "overtime";
+      countingDown = mode === "down";
+      inOvertime = false;
+
+      totalSeconds =
+        (countingDown || overtimeMode)
+          ? parseTime(startTimeInput.value)
+          : 0;
+
+      limitSeconds =
+        (!countingDown && !overtimeMode && limitTimeInput.value)
+          ? parseTime(limitTimeInput.value)
+          : null;
+
+      updateDisplay();
+      interval = setInterval(tick, 1000);
+    }
+
+    function pauseTimer() {
+      clearInterval(interval);
+    }
+
+    function resetTimer() {
+      clearInterval(interval);
+      totalSeconds = 0;
+      document.body.classList.remove("red-background");
+      extraLabel.style.display = "none";
+      updateDisplay();
+    }
+  </script>
+
+</body>
+</html>
