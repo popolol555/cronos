@@ -276,13 +276,35 @@
       extraLabel.style.display = "none";
       updateDisplay();
     }
-  </script>
+ 
 <script>
-  if ('serviceWorker' in navigator)
+  if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('service-worker.js')
-      .then(() => console.log('SW registrado ✅'))
-      .catch(console.error);
+      .then(() => {
+        console.log('SW registrado ✅');
+        const aviso = document.createElement('div');
+        aviso.textContent = '✅ Cronómetro listo para usar sin conexión';
+        aviso.style.position = 'absolute';
+        aviso.style.bottom = '10px';
+        aviso.style.left = '50%';
+        aviso.style.transform = 'translateX(-50%)';
+        aviso.style.background = 'rgba(255,255,255,0.1)';
+        aviso.style.color = 'white';
+        aviso.style.padding = '5px 15px';
+        aviso.style.fontSize = '12px';
+        aviso.style.border = '1px solid white';
+        aviso.style.borderRadius = '6px';
+        aviso.style.fontFamily = 'monospace';
+        document.body.appendChild(aviso);
+        setTimeout(() => aviso.remove(), 5000);
+      })
+      .catch(error => {
+        alert('⚠️ Error al registrar el cronómetro offline');
+        console.error(error);
+      });
+  }
 </script>
+
 
 </body>
 </html>
